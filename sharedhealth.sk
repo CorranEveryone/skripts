@@ -1,0 +1,104 @@
+# This doesn't have a lot of comments, I will address this in the future
+
+on load:
+    reset {aliveplayers::*}
+
+    if {serverhealth} is not {serverhealth}:
+        set {serverhealth} to 20
+    if {serverabsorpsion} is not {serverabsorpsion}:
+        set {serverabsorpsion} to 0
+    if {deaths} is not {deaths}:
+        set {deaths} to 0
+    
+    loop all worlds:
+        if gamerule doImmediateRespawn of loop-world is false:
+            set gamerule doImmediateRespawn of loop-world to true
+        if gamerule showDeathMessages of loop-world is true:
+            set gamerule showDeathMessages of loop-world to false
+
+on respawn:
+    add player to {aliveplayers::*}
+
+on join:
+    add player to {aliveplayers::*}
+
+on disconnect:
+    remove player from {aliveplayers::*}
+
+every 4 ticks:
+    loop all players:
+        if absorption amount of loop-player is above 0:
+            add absorption amount of loop-player to {serverabsorpsion}
+            set {health message} to "§e | +%absorption amount of loop-player/2%❤ from %loop-player%"
+            set {health message time} to 10
+            reset absorption amount of loop-player
+
+    if {serverhealth} is less than or equal to 0:
+        kill all players
+        set {serverhealth} to 20
+        broadcast "§c§lThe death was unknown"
+        reset {aliveplayers::*}
+
+    loop {aliveplayers::*}:
+        set loop-value's health to {serverhealth}/2
+    
+    # Prepare and Send the Action Bar
+    if {deaths} is greater than 0:
+        set {_death message} to "§4 | %{deaths}% ☠"
+    else:
+        set {_death message} to ""
+
+    if {health message time} is not less than or equal to 0:
+        set {_health message} to {health message}
+        remove 1 from {health message time}
+    else:
+        set {_health message} to ""
+
+    if {serverabsorpsion} is greater than 0: #❤
+        set {_absorption} to {serverabsorpsion}
+        set {_absorption message} to "§e | "
+        while {_absorption} is greater than or equal to 1: # Yes, this 1 is intentional, and so is removing 2.
+            remove 2 from {_absorption}
+            set {_absorption message} to merge components {_absorption message} and "§e❤"
+        if {_absorption} is greater than 0:
+            set {_absorption message} to merge components {_absorption message} and "§6❤"
+    else:
+        set {_absorption message} to ""
+
+    set {_damage message} to "§4 | %{deaths}% ☠"
+    send the actionbar "§c§lShared Health%{_health message}%%{_death message}%%{_absorption message}%" to all players
+
+on damage of a player:
+    if event-damage cause is not kill:
+        if victim is not blocking:
+            if {serverabsorpsion} is above 0:
+                if {serverabsorpsion} is greater than damage:
+                    remove damage from {serverabsorpsion}
+                    remove damage from damage
+                else:
+                    remove {serverabsorpsion} from damage
+                    set {serverabsorpsion} to 0
+            remove damage from {serverhealth}
+            set {health message} to "§c | -%damage/2%❤ from %victim%"
+            set {health message time} to 10
+            
+            if {serverhealth} is less than or equal to 0:
+                cancel event
+                reset {aliveplayers::*}
+                kill all players
+                add 1 to {deaths}
+                set {serverhealth} to 20
+                if attacker is set:
+                    broadcast "§c§l%victim% died from %event-damage cause% by %attacker%"
+                else:
+                    broadcast "§c§l%victim% died from %event-damage cause%"
+
+on heal of a player:
+    add heal amount to {serverhealth}
+    set {health message} to "§a | +%heal amount/2%❤ from %entity%"
+    set {health message time} to 10
+
+on death of a player:
+    if event-damage cause is not kill:
+        cancel event
+        set victim's health to {serverhealth}/2
